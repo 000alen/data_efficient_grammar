@@ -2,7 +2,7 @@ from typing import List
 from rdkit import Chem
 from copy import deepcopy
 import numpy as np
-from private import *
+from deg import *
 from grammar_generation import *
 from agent import Agent
 import torch.optim as optim

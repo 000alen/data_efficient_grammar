@@ -1,13 +1,13 @@
 from typing import Dict, List, Tuple, Union
 from rdkit import Chem
-from functools import partial
-from multiprocessing import Pool
+# from functools import partial
+# from multiprocessing import Pool
 from fuseprop import find_clusters, extract_subgraph, get_mol, get_smiles, find_fragments
 from copy import deepcopy
 import numpy as np
 import torch
-import argparse
-from private import *
+# import argparse
+from deg import *
 from agent import sample
 
 
@@ -55,7 +55,15 @@ def data_processing(input_smiles: List[str], GNN_model_path: str, motif=False) -
     return subgraph_set, input_graphs_dict
 
 
-def grammar_generation(agent, input_graphs_dict, subgraph_set, grammar, mcmc_iter, sample_number, args):
+def grammar_generation(
+    agent: torch.nn.Module, 
+    input_graphs_dict: Dict, 
+    subgraph_set: SubGraphSet, 
+    grammar: ProductionRuleCorpus, 
+    mcmc_iter: int, 
+    sample_number: int, 
+    args
+) -> Tuple[bool, Dict, SubGraphSet, ProductionRuleCorpus]:
     # Selected hyperedge (subgraph)
     plist = [*subgraph_set.map_to_input]
 
@@ -88,7 +96,8 @@ def grammar_generation(agent, input_graphs_dict, subgraph_set, grammar, mcmc_ite
                 final_feature.append(1 - np.exp(-num_occurance))
                 final_feature.append(num_in_input / len(list(input_graphs_dict.keys())))
                 all_final_features.append(torch.unsqueeze(torch.from_numpy(np.array(final_feature)).float(), 0))
-            while(True):
+            
+            while True:
                 action_list, take_action = sample(agent, torch.vstack(all_final_features), mcmc_iter, sample_number)
                 if take_action:
                     break
@@ -96,6 +105,7 @@ def grammar_generation(agent, input_graphs_dict, subgraph_set, grammar, mcmc_ite
             action_list = [1]
         else:
             continue
+
         print("Hyperedge sampling:", action_list)
         # Merge connected hyperedges
         p_star_list = input_g.merge_selected_subgraphs(action_list)
@@ -118,17 +128,30 @@ def grammar_generation(agent, input_graphs_dict, subgraph_set, grammar, mcmc_ite
     return False, new_input_graphs_dict, new_subgraph_set, new_grammar
 
 
-def MCMC_sampling(agent, all_input_graphs_dict, all_subgraph_set, all_grammar, sample_number, args):
+def MCMC_sampling(
+    agent: torch.nn.Module, 
+    all_input_graphs_dict: Dict, 
+    all_subgraph_set: SubGraphSet, 
+    all_grammar: ProductionRuleCorpus, 
+    sample_number: int, 
+    args
+) -> Tuple[int, ProductionRuleCorpus, Dict]:
+    """Markov Chain Monte Carlo sampling for grammar generation."""
+
     iter_num = 0
-    while(True):
+    while True:
         print("======MCMC iter{}======".format(iter_num))
+        
         done_flag, new_input_graphs_dict, new_subgraph_set, new_grammar = grammar_generation(agent, all_input_graphs_dict, all_subgraph_set, all_grammar, iter_num, sample_number, args)
+
         print("Graph contraction status: ", done_flag)
         if done_flag:
             break
+        
         all_input_graphs_dict = deepcopy(new_input_graphs_dict)
         all_subgraph_set = deepcopy(new_subgraph_set)
         all_grammar = deepcopy(new_grammar)
+        
         iter_num += 1
 
     return iter_num, new_grammar, new_input_graphs_dict

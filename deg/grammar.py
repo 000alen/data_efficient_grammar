@@ -1,6 +1,6 @@
-from private.symbol import TSymbol, NTSymbol, BondSymbol
-from private.utils import _node_match, _node_match_prod_rule, _edge_match, masked_softmax
-from private.hypergraph import Hypergraph, common_node_list
+from deg.symbol import TSymbol, NTSymbol, BondSymbol
+from deg.utils import _node_match, _node_match_prod_rule, _edge_match, masked_softmax
+from deg.hypergraph import Hypergraph, common_node_list
 from collections import Counter
 from copy import deepcopy
 from functools import partial

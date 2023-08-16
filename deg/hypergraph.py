@@ -6,7 +6,7 @@ from typing import List, Dict, Tuple
 from collections import Counter
 import networkx as nx
 from networkx.algorithms.isomorphism import GraphMatcher
-from private.utils import _node_match, _node_match_prod_rule, _edge_match, masked_softmax
+from deg.utils import _node_match, _node_match_prod_rule, _edge_match, masked_softmax
 from functools import partial
 import numpy as np
 import os

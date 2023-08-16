@@ -2,7 +2,7 @@ from typing import List
 from rdkit import Chem
 from copy import deepcopy
 import numpy as np
-from private import *
+from deg import *
 from grammar_generation import *
 from agent import Agent
 import torch.optim as optim
@@ -108,8 +108,10 @@ def learn(smiles_list: List[str], args):
     agent = Agent(feat_dim=300, hidden_size=args.hidden_size)
     if args.resume:
         assert  os.path.exists(args.resume_path), "Please provide valid path for resuming."
-        ckpt = torch.load(args.resume_path)
-        agent.load_state_dict(ckpt)
+
+        state_dict = torch.load(args.resume_path)
+        agent.load_state_dict(state_dict)
+
     optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate)
 
     # Start training

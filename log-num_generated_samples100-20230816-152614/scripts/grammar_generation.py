@@ -7,7 +7,7 @@ from copy import deepcopy
 import numpy as np
 import torch
 import argparse
-from private import *
+from deg import *
 from agent import sample
 
 
