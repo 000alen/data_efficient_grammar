@@ -19,7 +19,11 @@ import fcntl
 from retro_star_listener import lock
 
 
-def evaluate(grammar: ProductionRuleCorpus, args, metrics=['diversity', 'syn']):
+def evaluate(
+    grammar: ProductionRuleCorpus, 
+    args, 
+    metrics=['diversity', 'syn']
+):
     # Metric evalution for the given gramamr
     div = InternalDiversity()
     eval_metrics = {}
@@ -28,8 +32,9 @@ def evaluate(grammar: ProductionRuleCorpus, args, metrics=['diversity', 'syn']):
     iter_num_list = []
     idx = 0
     no_newly_generated_iter = 0
+
     print("Start grammar evaluation...")
-    while(True):
+    while True:
         print("Generating sample {}/{}".format(idx, args.num_generated_samples))
         mol, iter_num = random_produce(grammar)
         if mol is None:
@@ -47,17 +52,17 @@ def evaluate(grammar: ProductionRuleCorpus, args, metrics=['diversity', 'syn']):
         if idx >= args.num_generated_samples or no_newly_generated_iter > 10:
             break
 
-    for _metric in metrics:
-        assert _metric in ['diversity', 'num_rules', 'num_samples', 'syn']
-        if _metric == 'diversity':
+    for metric in metrics:
+        assert metric in ['diversity', 'num_rules', 'num_samples', 'syn']
+        if metric == 'diversity':
             diversity = div.get_diversity(generated_samples)
-            eval_metrics[_metric] = diversity
-        elif _metric == 'num_rules':
-            eval_metrics[_metric] = grammar.num_prod_rule
-        elif _metric == 'num_samples':
-            eval_metrics[_metric] = idx
-        elif _metric == 'syn':
-            eval_metrics[_metric] = retro_sender(generated_samples, args)
+            eval_metrics[metric] = diversity
+        elif metric == 'num_rules':
+            eval_metrics[metric] = grammar.num_prod_rule
+        elif metric == 'num_samples':
+            eval_metrics[metric] = idx
+        elif metric == 'syn':
+            eval_metrics[metric] = retro_sender(generated_samples, args)
         else:
             raise NotImplementedError
     return eval_metrics
@@ -67,6 +72,7 @@ def retro_sender(generated_samples, args):
     # File communication to obtain retro-synthesis rate
     with open(args.receiver_file, 'w') as fw:
         fw.write('')
+
     while(True):
         with open(args.sender_file, 'r') as fr:
             editable = lock(fr)
@@ -76,6 +82,7 @@ def retro_sender(generated_samples, args):
                         fw.write('{}\n'.format(Chem.MolToSmiles(sample)))
                 break
             fcntl.flock(fr, fcntl.LOCK_UN)
+            
     num_samples = len(generated_samples)
     print("Waiting for retro_star evaluation...")
     while(True):
@@ -130,10 +137,11 @@ def learn(smiles_list: List[str], args):
             l_grammar = deepcopy(grammar_init)
             iter_num, l_grammar, l_input_graphs_dict = MCMC_sampling(agent, l_input_graphs_dict, l_subgraph_set, l_grammar, num, args)
             # Grammar evaluation
-            eval_metric = evaluate(l_grammar, args, metrics=['diversity', 'syn'])
+            eval_metric = evaluate(l_grammar, args, metrics=['diversity'])
             logger.info("eval_metrics: {}".format(eval_metric))
             # Record metrics
-            R = eval_metric['diversity'] + 2 * eval_metric['syn']
+            # R = eval_metric['diversity'] + 2 * eval_metric['syn']
+            R = eval_metric['diversity']
             R_ind = R.copy()
             returns.append(R)
             log_returns.append(eval_metric)
