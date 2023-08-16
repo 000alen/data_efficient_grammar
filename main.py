@@ -142,7 +142,7 @@ def learn(smiles_list: List[str], args):
             # Record metrics
             # R = eval_metric['diversity'] + 2 * eval_metric['syn']
             R = eval_metric['diversity']
-            R_ind = R.copy()
+            R_ind = deepcopy(R)
             returns.append(R)
             log_returns.append(eval_metric)
             logger.info("======Sample {} returns {}=======:".format(num, R_ind))
