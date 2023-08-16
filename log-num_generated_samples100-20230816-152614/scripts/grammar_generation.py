@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple, Union
+from typing import Tuple, Union
 from rdkit import Chem
 from functools import partial
 from multiprocessing import Pool
@@ -11,7 +11,7 @@ from private import *
 from agent import sample
 
 
-def data_processing(input_smiles: List[str], GNN_model_path: str, motif=False) -> Tuple[SubGraphSet, Dict]:
+def data_processing(input_smiles, GNN_model_path, motif=False):
     input_mols = []
     input_graphs = []
     init_subgraphs = []

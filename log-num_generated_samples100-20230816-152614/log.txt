@@ -1,0 +1,4 @@
+[2023-08-16 15:26:14,030][        main.py][line: 103][    INFO] args:Namespace(GNN_model_path='./GCN/model_gin/supervised_contextpred.pth', MCMC_size=5, gammar=0.99, hidden_size=128, learning_rate=0.01, max_epoches=50, motif=False, num_generated_samples=100, receiver_file='output_syn.txt', resume=False, resume_path='', sender_file='generated_samples.txt', training_data='./datasets/acrylates.txt')
+[2023-08-16 15:26:14,346][        main.py][line: 116][    INFO] starting
+
+[2023-08-16 15:26:14,346][        main.py][line: 121][    INFO] <<<<< Epoch 0/50 >>>>>>

@@ -19,7 +19,7 @@ import fcntl
 from retro_star_listener import lock
 
 
-def evaluate(grammar: ProductionRuleCorpus, args, metrics=['diversity', 'syn']):
+def evaluate(grammar, args, metrics=['diversity', 'syn']):
     # Metric evalution for the given gramamr
     div = InternalDiversity()
     eval_metrics = {}
@@ -136,7 +136,6 @@ def learn(smiles_list: List[str], args):
             returns.append(R)
             log_returns.append(eval_metric)
             logger.info("======Sample {} returns {}=======:".format(num, R_ind))
-            
             # Save ckpt
             if R_ind > curr_max_R:
                 torch.save(agent.state_dict(), os.path.join(save_log_path, 'epoch_agent_{}_{}.pkl'.format(train_epoch, R_ind)))

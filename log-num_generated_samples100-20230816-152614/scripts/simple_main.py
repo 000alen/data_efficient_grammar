@@ -1,4 +1,3 @@
-from typing import List
 from rdkit import Chem
 from copy import deepcopy
 import numpy as np
@@ -19,7 +18,7 @@ import fcntl
 from retro_star_listener import lock
 
 
-def evaluate(grammar: ProductionRuleCorpus, args, metrics=['diversity', 'syn']):
+def evaluate(grammar, args, metrics=['diversity', 'syn']):
     # Metric evalution for the given gramamr
     div = InternalDiversity()
     eval_metrics = {}
@@ -95,7 +94,7 @@ def retro_sender(generated_samples, args):
     return np.mean([int(eval(s[1])) for s in syn_status])
 
 
-def learn(smiles_list: List[str], args):
+def learn(smiles_list, args):
     # Create logger
     save_log_path = 'log-num_generated_samples{}-{}'.format(args.num_generated_samples, time.strftime("%Y%m%d-%H%M%S"))
     create_exp_dir(save_log_path, scripts_to_save=[f for f in os.listdir('./') if f.endswith('.py')])
@@ -110,7 +109,6 @@ def learn(smiles_list: List[str], args):
         assert  os.path.exists(args.resume_path), "Please provide valid path for resuming."
         ckpt = torch.load(args.resume_path)
         agent.load_state_dict(ckpt)
-    optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate)
 
     # Start training
     logger.info('starting\n')
@@ -136,7 +134,6 @@ def learn(smiles_list: List[str], args):
             returns.append(R)
             log_returns.append(eval_metric)
             logger.info("======Sample {} returns {}=======:".format(num, R_ind))
-            
             # Save ckpt
             if R_ind > curr_max_R:
                 torch.save(agent.state_dict(), os.path.join(save_log_path, 'epoch_agent_{}_{}.pkl'.format(train_epoch, R_ind)))
@@ -146,44 +143,15 @@ def learn(smiles_list: List[str], args):
                     pickle.dump(l_input_graphs_dict, outp, pickle.HIGHEST_PROTOCOL)
                 curr_max_R = R_ind
         
-        # Calculate loss
-        returns = torch.tensor(returns)
-        returns = (returns - returns.mean()) # / (returns.std() + eps)
-        assert len(returns) == len(list(agent.saved_log_probs.keys()))
-        policy_loss = torch.tensor([0.])
-        for sample_number in agent.saved_log_probs.keys():
-            max_iter_num = max(list(agent.saved_log_probs[sample_number].keys()))
-            for iter_num_key in agent.saved_log_probs[sample_number].keys():
-                log_probs = agent.saved_log_probs[sample_number][iter_num_key]
-                for log_prob in log_probs:
-                    policy_loss += (-log_prob * args.gammar ** (max_iter_num - iter_num_key) * returns[sample_number]).sum()
-
-        # Back Propogation and update
-        optimizer.zero_grad()
-        policy_loss.backward()
-        optimizer.step()
-        agent.saved_log_probs.clear()
-
-        # Log
-        logger.info("Loss: {}".format(policy_loss.clone().item()))
-        eval_metrics = {}
-        for r in log_returns:
-            for _key in r.keys():
-                if _key not in eval_metrics:
-                    eval_metrics[_key] = []
-                eval_metrics[_key].append(r[_key])
-        mean_evaluation_metrics = ["{}: {}".format(_key, np.mean(eval_metrics[_key])) for _key in eval_metrics]
-        logger.info("Mean evaluation metrics: {}".format(', '.join(mean_evaluation_metrics)))
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='MCMC training')
     parser.add_argument('--training_data', type=str, default="./datasets/isocyanates.txt", help="file name of the training data")
     parser.add_argument('--GNN_model_path', type=str, default="./GCN/model_gin/supervised_contextpred.pth", help="file name of the pretrained GNN model")
     parser.add_argument('--hidden_size', type=int, default=128, help="hidden size of the potential function")
-    parser.add_argument('--max_epoches', type=int, default=50, help="maximal training epoches")
+    parser.add_argument('--max_epoches', type=int, default=1, help="maximal training epoches")
     parser.add_argument('--num_generated_samples', type=int, default=100, help="number of generated samples to evaluate grammar")
-    parser.add_argument('--MCMC_size', type=int, default=5, help="sample number of each step of MCMC")
+    parser.add_argument('--MCMC_size', type=int, default=1, help="sample number of each step of MCMC")
     parser.add_argument('--learning_rate', type=int, default=1e-2, help="learning rate")
     parser.add_argument('--gammar', type=float, default=0.99, help="discount factor")
     parser.add_argument('--motif', action="store_true", default=False, help="use motif as the basic building block for polymer dataset")
@@ -206,7 +174,6 @@ if __name__ == '__main__':
     # Clear the communication files for Retro*
     with open(args.sender_file, 'w') as fw:
         fw.write('')
-
     with open(args.receiver_file, 'w') as fw:
         fw.write('')
     
