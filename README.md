@@ -23,6 +23,7 @@ git clone git@github.com:gmh14/data_efficient_grammar.git
 cd data_efficient_grammar
 conda env create -f environment.yml
 conda activate DEG
+./postinstall.sh
 pip install -e retro_star/packages/mlp_retrosyn
 pip install -e retro_star/packages/rdchiral
 ```

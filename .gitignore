@@ -1,3 +1,5 @@
+grammar-log
+
 *.swp
 __pycache__/
 ./*/__pycache__/
