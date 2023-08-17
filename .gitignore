@@ -1,4 +1,7 @@
 grammar-log
+log-*
+generated_samples.txt
+output_syn.txt
 
 *.swp
 __pycache__/
