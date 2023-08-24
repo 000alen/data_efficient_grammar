@@ -28,9 +28,10 @@ def sample(agent, subgraph_feature, iter_num, sample_number):
     if take_action:
         if sample_number not in agent.saved_log_probs.keys():
             agent.saved_log_probs[sample_number] = {}
+            
         if iter_num not in agent.saved_log_probs[sample_number].keys():
-            agent.saved_log_probs[sample_number][iter_num] = [m.log_prob(a)]
-        else:
-            agent.saved_log_probs[sample_number][iter_num].append(m.log_prob(a))
+            agent.saved_log_probs[sample_number][iter_num] = []
+
+        agent.saved_log_probs[sample_number][iter_num].append(m.log_prob(a))
     return a.numpy(), take_action
     

@@ -1,5 +1,3 @@
-import torch
-import torch.multiprocessing as mp
 import numpy as np
 import fcntl
 import argparse

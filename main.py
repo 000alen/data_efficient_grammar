@@ -3,19 +3,17 @@ from rdkit import Chem
 from copy import deepcopy
 import numpy as np
 from deg import *
-from grammar_generation import *
 from agent import Agent
 import torch.optim as optim
-import torch.multiprocessing as mp
 import logging
 import torch
-import math
 import os
 import time
 import pprint
 import pickle
 import argparse
 import fcntl
+from grammar_generation import MCMC_sampling, data_processing, random_produce
 from retro_star_listener import lock
 
 
@@ -110,7 +108,7 @@ def learn(smiles_list: List[str], args):
     logger.info('args:{}'.format(pprint.pformat(args)))
     logger = logging.getLogger('global_logger')
 
-    # Initialize dataset & potential function (agent) & optimizer
+    # Initialize dataset, potential function (agent), and optimizer
     subgraph_set_init, input_graphs_dict_init = data_processing(smiles_list, args.GNN_model_path, args.motif)
     agent = Agent(feat_dim=300, hidden_size=args.hidden_size)
     if args.resume:
@@ -123,43 +121,63 @@ def learn(smiles_list: List[str], args):
 
     # Start training
     logger.info('starting\n')
-    curr_max_R = 0
+    R_max = 0
     for train_epoch in range(args.max_epoches):
         returns = []
         log_returns = []
         logger.info("<<<<< Epoch {}/{} >>>>>>".format(train_epoch, args.max_epoches))
 
-        # MCMC sampling
+        # ! MCMC sampling
         for num in range(args.MCMC_size):
             grammar_init = ProductionRuleCorpus()
+            
             l_input_graphs_dict = deepcopy(input_graphs_dict_init)
             l_subgraph_set = deepcopy(subgraph_set_init)
             l_grammar = deepcopy(grammar_init)
-            iter_num, l_grammar, l_input_graphs_dict = MCMC_sampling(agent, l_input_graphs_dict, l_subgraph_set, l_grammar, num, args)
+            
+            iter_num, l_grammar, l_input_graphs_dict = MCMC_sampling(
+                agent, 
+                l_input_graphs_dict, 
+                l_subgraph_set, 
+                l_grammar, 
+                num, 
+                args
+            )
+            
             # Grammar evaluation
-            eval_metric = evaluate(l_grammar, args, metrics=['diversity'])
+            eval_metric = evaluate(l_grammar, args)
             logger.info("eval_metrics: {}".format(eval_metric))
+            
             # Record metrics
-            # R = eval_metric['diversity'] + 2 * eval_metric['syn']
-            R = eval_metric['diversity']
-            R_ind = deepcopy(R)
+            R = eval_metric['diversity'] + 2 * eval_metric['syn']
+            # R = eval_metric['diversity']
+            
+            R_i = deepcopy(R)
             returns.append(R)
+            
             log_returns.append(eval_metric)
-            logger.info("======Sample {} returns {}=======:".format(num, R_ind))
+            logger.info("======Sample {} returns {}=======:".format(num, R_i))
             
             # Save ckpt
-            if R_ind > curr_max_R:
-                torch.save(agent.state_dict(), os.path.join(save_log_path, 'epoch_agent_{}_{}.pkl'.format(train_epoch, R_ind)))
-                with open('{}/epoch_grammar_{}_{}.pkl'.format(save_log_path, train_epoch, R_ind), 'wb') as outp:
+            if R_i > R_max:
+                torch.save(
+                    agent.state_dict(), 
+                    os.path.join(save_log_path, 'epoch_agent_{}_{}.pkl'.format(train_epoch, R_i))
+                )
+                
+                with open('{}/epoch_grammar_{}_{}.pkl'.format(save_log_path, train_epoch, R_i), 'wb') as outp:
                     pickle.dump(l_grammar, outp, pickle.HIGHEST_PROTOCOL)
-                with open('{}/epoch_input_graphs_{}_{}.pkl'.format(save_log_path, train_epoch, R_ind), 'wb') as outp:
+                
+                with open('{}/epoch_input_graphs_{}_{}.pkl'.format(save_log_path, train_epoch, R_i), 'wb') as outp:
                     pickle.dump(l_input_graphs_dict, outp, pickle.HIGHEST_PROTOCOL)
-                curr_max_R = R_ind
+                
+                R_max = R_i
         
-        # Calculate loss
+        # ! Calculate loss
         returns = torch.tensor(returns)
         returns = (returns - returns.mean()) # / (returns.std() + eps)
         assert len(returns) == len(list(agent.saved_log_probs.keys()))
+
         policy_loss = torch.tensor([0.])
         for sample_number in agent.saved_log_probs.keys():
             max_iter_num = max(list(agent.saved_log_probs[sample_number].keys()))
@@ -168,7 +186,7 @@ def learn(smiles_list: List[str], args):
                 for log_prob in log_probs:
                     policy_loss += (-log_prob * args.gammar ** (max_iter_num - iter_num_key) * returns[sample_number]).sum()
 
-        # Back Propogation and update
+        # ! Back Propogation and update
         optimizer.zero_grad()
         policy_loss.backward()
         optimizer.step()
@@ -205,6 +223,7 @@ if __name__ == '__main__':
 
     # Get raw training data
     assert os.path.exists(args.training_data), "Please provide valid path of training data."
+    
     # Remove duplicated molecules
     with open(args.training_data, 'r') as fr:
         lines = fr.readlines()

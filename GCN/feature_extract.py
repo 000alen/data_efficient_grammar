@@ -25,7 +25,15 @@ class feature_extractor():
         return data
 
     def extract(self, graph_mol):
-        model = GNN_feature(num_layer=5, emb_dim=300, num_tasks=1, JK='last', drop_ratio=0, graph_pooling='mean', gnn_type='gin')
+        model = GNN_feature(
+            num_layer=5, 
+            emb_dim=300, 
+            num_tasks=1, 
+            JK='last', 
+            drop_ratio=0, 
+            graph_pooling='mean', 
+            gnn_type='gin'
+        )
         model.from_pretrained(self.pretrained_model_path)
         # model.cuda(device=0)
         model.eval()

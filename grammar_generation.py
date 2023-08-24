@@ -1,8 +1,5 @@
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Sequence, Tuple, TypeVar, Union
 from rdkit import Chem
-# from functools import partial
-# from multiprocessing import Pool
-# import argparse
 from fuseprop import find_clusters, extract_subgraph, get_mol, get_smiles, find_fragments
 from copy import deepcopy
 import numpy as np
@@ -11,7 +8,10 @@ from deg import *
 from agent import sample
 
 
-def data_processing(input_smiles: List[str], GNN_model_path: str, motif=False) -> Tuple[SubGraphSet, Dict]:
+T = TypeVar('T')
+
+
+def data_processing(input_smiles: List[str], GNN_model_path: str, motif=False) -> Tuple[SubGraphSet, Dict[MolKey, InputGraph]]:
     input_mols = []
     input_graphs = []
     init_subgraphs = []
@@ -57,7 +57,7 @@ def data_processing(input_smiles: List[str], GNN_model_path: str, motif=False) -
 
 def grammar_generation(
     agent: torch.nn.Module, 
-    input_graphs_dict: Dict, 
+    input_graphs_dict: Dict[MolKey, InputGraph], 
     subgraph_set: SubGraphSet, 
     grammar: ProductionRuleCorpus, 
     mcmc_iter: int, 
@@ -72,7 +72,9 @@ def grammar_generation(
         # done_flag, new_input_graphs_dict, new_subgraph_set, new_grammar
         return True, input_graphs_dict, subgraph_set, grammar
 
-    # Update every InputGraph: remove every subgraph that equals to p_star, for those subgraphs that contain atom idx in p_star, replace the atom with p_star
+    # Update every InputGraph: remove every subgraph that equals to p_star, 
+    # for those subgraphs that contain atom idx in p_star, replace the 
+    # atom with p_star
     org_input_graphs_dict = deepcopy(input_graphs_dict)
     org_subgraph_set = deepcopy(subgraph_set)
     org_grammar = deepcopy(grammar)
@@ -81,7 +83,8 @@ def grammar_generation(
     subgraph_set = deepcopy(org_subgraph_set)
     grammar = deepcopy(org_grammar)
 
-    for i, (key, input_g) in enumerate(input_graphs_dict.items()):
+    # for i, (key, input_g) in enumerate(input_graphs_dict.items()):
+    for i, input_g in enumerate(input_graphs_dict.values()):
         print("---for graph {}---".format(i))
         action_list = []
         all_final_features = []
@@ -95,10 +98,18 @@ def grammar_generation(
                 final_feature.extend(subg_feature.tolist())
                 final_feature.append(1 - np.exp(-num_occurance))
                 final_feature.append(num_in_input / len(list(input_graphs_dict.keys())))
-                all_final_features.append(torch.unsqueeze(torch.from_numpy(np.array(final_feature)).float(), 0))
+                all_final_features.append(
+                    torch.unsqueeze(torch.from_numpy(np.array(final_feature)).float(), 
+                                    0)
+                )
             
             while True:
-                action_list, take_action = sample(agent, torch.vstack(all_final_features), mcmc_iter, sample_number)
+                action_list, take_action = sample(
+                    agent, 
+                    torch.vstack(all_final_features), 
+                    mcmc_iter, 
+                    sample_number
+                )
                 if take_action:
                     break
         elif len(input_g.subgraphs) == 1:
@@ -142,7 +153,15 @@ def MCMC_sampling(
     while True:
         print("======MCMC iter{}======".format(iter_num))
         
-        done_flag, new_input_graphs_dict, new_subgraph_set, new_grammar = grammar_generation(agent, all_input_graphs_dict, all_subgraph_set, all_grammar, iter_num, sample_number, args)
+        done_flag, new_input_graphs_dict, new_subgraph_set, new_grammar = grammar_generation(
+            agent, 
+            all_input_graphs_dict, 
+            all_subgraph_set, 
+            all_grammar, 
+            iter_num, 
+            sample_number, 
+            args
+        )
 
         print("Graph contraction status: ", done_flag)
         if done_flag:
@@ -157,64 +176,91 @@ def MCMC_sampling(
     return iter_num, new_grammar, new_input_graphs_dict
 
 
-def random_produce(grammar: ProductionRuleCorpus) -> Union[Tuple[Chem.RWMol, int], Tuple[None, int]]:
+
+def random_produce(
+    grammar: ProductionRuleCorpus,
+    *,
+    max_steps: int = 30
+) -> Union[Tuple[Chem.RWMol, int], Tuple[None, int]]:
     """Returns a random molecule sampled from the grammar (and the number of steps).
     
     Returns `None` if the process fails to produce a molecule.
     """
     
-    def sample(l, prob=None):
+    def sample(l: Sequence[T], prob: Optional[Sequence[float]]=None) -> Tuple[T, int]:
         if prob is None:
             prob = [1/len(l)] * len(l)
         idx =  np.random.choice(range(len(l)), 1, p=prob)[0]
         return l[idx], idx
 
-    def prob_schedule(_iter, selected_idx):
-        prob_list = []
-        # prob = exp(a * t * x), x = {0, 1}
+    def prob_schedule(step: int, selected_idx: List[int]):
+        """
+        prob = exp(a * t * x), x = {0, 1}
+            where x indicates if the current rule is an 
+            ending rule
+        
+        NOTE: This make is less likely for ending rules, 
+            and impossible for starting rules
+        """
+        
         a = 0.5
-        for rule_i, rule in enumerate(grammar.prod_rule_list):
-            x = rule.is_ending
-            if rule.is_start_rule:
-                prob_list.append(0)
-            else:
-                prob_list.append(np.exp(a * _iter * x))
+
+        prob_list = [
+            0 if rule.is_start_rule
+            else np.exp(a * step * rule.is_ending)
+            for rule in grammar.prod_rule_list
+        ]
+
+        # mask selected idx
         prob_list = np.array(prob_list)[selected_idx]
+        
+        # normalize
         prob_list = prob_list / np.sum(prob_list)
+        
         return prob_list
 
     hypergraph = Hypergraph()
-    starting_rules = [(rule_i, rule) for rule_i, rule in enumerate(grammar.prod_rule_list) if rule.is_start_rule]
-    steps = 0
-    while(True):
-        if steps == 0:
-            (selected_rule_idx, selected_rule), idx = sample(starting_rules)
-            # selected_rule_idx, selected_rule = starting_rules[idx]
+    starting_rules = [
+        rule 
+        for rule in grammar.prod_rule_list 
+        if rule.is_start_rule
+    ]
 
-            hg_cand, _, avail = selected_rule.graph_rule_applied_to(hypergraph)
-            hypergraph = deepcopy(hg_cand)
+    step = 0
+    while True:
+        if step == 0:
+            # NOTE: samples a random starting rule and applies it to the hg
+            selected_rule, idx = sample(starting_rules)
+            candidate_hg, _, available = selected_rule.graph_rule_applied_to(hypergraph)
+            hypergraph = deepcopy(candidate_hg)
         else:
-            candidate_rule = []
-            candidate_rule_idx = []
-            candidate_hg = []
+            # NOTE: tries to apply all the production rules in the grammar, and keeps track of the ones that work
+            candidate_rules: List[ProductionRule] = []
+            candidate_rules_idx: List[int] = []
+            candidate_hgs: List[Hypergraph] = []
             for rule_i, rule in enumerate(grammar.prod_rule_list):
-                hg_prev = deepcopy(hypergraph)
-                hg_cand, _, avail = rule.graph_rule_applied_to(hypergraph)
-                if(avail):
-                    candidate_rule.append(rule)
-                    candidate_rule_idx.append(rule_i)
-                    candidate_hg.append(hg_cand)
-            if (all([rl.is_start_rule for rl in candidate_rule]) and steps > 0) or steps > 30:
+                candidate_hg, _, available = rule.graph_rule_applied_to(hypergraph)
+                if available:
+                    candidate_rules.append(rule)
+                    candidate_rules_idx.append(rule_i)
+                    candidate_hgs.append(candidate_hg)
+            
+            # NOTE: If all if the candidate rules are starting rules or the number of steps is larger than `max_steps`, stop
+            if (all(rule.is_start_rule for rule in candidate_rules) and step > 0) or step > max_steps:
                 break
-            prob_list = prob_schedule(steps, candidate_rule_idx)
-            hypergraph, idx = sample(candidate_hg, prob_list)
-            selected_rule = candidate_rule_idx[idx]
-        steps += 1
+            
+            hypergraph, idx = sample(
+                candidate_hgs, 
+                prob_schedule(step, candidate_rules_idx)
+            )
+            selected_rule = candidate_rules[idx]
+        
+        step += 1
 
     try:
         mol = hg_to_mol(hypergraph)
         print(Chem.MolToSmiles(mol))
     except:
-        return None, steps
+        return None, step
 
-    return mol, steps
+    return mol, step

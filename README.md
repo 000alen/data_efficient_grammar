@@ -1,11 +1,8 @@
 # Data-Efficient Graph Grammar Learning for Molecular Generation
 
-This repository contains the implementation code for paper [Data-Efficient Graph Grammar Learning for Molecular Generation
-](https://openreview.net/forum?id=l4IHywGq6a) (**ICLR 2022 oral**).
+This repository contains the implementation code for paper [Data-Efficient Graph Grammar Learning for Molecular Generation](https://openreview.net/forum?id=l4IHywGq6a) (**ICLR 2022 oral**).
 
-In this work, we propose a data-efficient generative model (**DEG**) that can be learned from datasets with orders of
-magnitude smaller sizes than common benchmarks. At the heart of this method is a learnable graph grammar that generates molecules from a sequence of production rules. Our learned graph grammar yields state-of-the-art results on generating high-quality molecules for
-three monomer datasets that contain only ∼20 samples each.
+In this work, we propose a data-efficient generative model (**DEG**) that can be learned from datasets with orders of magnitude smaller sizes than common benchmarks. At the heart of this method is a learnable graph grammar that generates molecules from a sequence of production rules. Our learned graph grammar yields state-of-the-art results on generating high-quality molecules for three monomer datasets that contain only ∼20 samples each.
 
 ![overview](assets/pipeline.png)
 

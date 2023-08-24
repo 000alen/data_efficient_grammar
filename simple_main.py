@@ -2,19 +2,16 @@ from rdkit import Chem
 from copy import deepcopy
 import numpy as np
 from deg import *
-from grammar_generation import *
 from agent import Agent
-import torch.optim as optim
-import torch.multiprocessing as mp
 import logging
 import torch
-import math
 import os
 import time
 import pprint
 import pickle
 import argparse
 import fcntl
+from grammar_generation import MCMC_sampling, data_processing, random_produce
 from retro_star_listener import lock
 
 

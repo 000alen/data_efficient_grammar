@@ -549,6 +549,8 @@ class ProductionRuleCorpus(object):
         a matrix of lhs vs prod_rule (= lhs_in_prod_rule)
     '''
 
+    prod_rule_list: List[ProductionRule]
+
     def __init__(self):
         self.prod_rule_list = []
         self.edge_symbol_list = []

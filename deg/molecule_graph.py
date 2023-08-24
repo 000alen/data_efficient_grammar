@@ -138,8 +138,11 @@ class InputGraph(MolGraph):
         # Get feature vector for agent
         assert isinstance(subgraph, SubGraph)
         assert subgraph in self.subgraphs
-        subfrags_feature = []
-        nodes_feat = [self.get_nodes_feature(node_id).detach().cpu().numpy() for node_id in subgraph.subfrags]
+        # subfrags_feature = []
+        nodes_feat = [
+            self.get_nodes_feature(node_id).detach().cpu().numpy() 
+            for node_id in subgraph.subfrags
+        ]
         subfrags_feature = np.mean(nodes_feat, axis=0)
         return subfrags_feature # TODO could modify # should be an order-invariant function 
 
